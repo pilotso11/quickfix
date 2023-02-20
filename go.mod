@@ -1,4 +1,4 @@
-module github.com/quickfixgo/quickfix
+module github.com/pilotso11/quickfix
 
 go 1.18
 
