@@ -66,13 +66,15 @@ func (state inSession) FixMsgIn(session *session, msg *Message) sessionState {
 func (state inSession) Timeout(session *session, event internal.Event) (nextState sessionState) {
 	switch event {
 	case internal.NeedHeartbeat:
-		heartBt := NewMessage()
+		heartBt := NewMessageFromPool()
+		defer ReleaseMessageToPool(heartBt)
 		heartBt.Header.SetField(tagMsgType, FIXString("0"))
 		if err := session.send(heartBt); err != nil {
 			return handleStateError(session, err)
 		}
 	case internal.PeerTimeout:
-		testReq := NewMessage()
+		testReq := NewMessageFromPool()
+		defer ReleaseMessageToPool(testReq)
 		testReq.Header.SetField(tagMsgType, FIXString("1"))
 		testReq.Body.SetField(tagTestReqID, FIXString("TEST"))
 		if err := session.send(testReq); err != nil {
@@ -230,7 +232,8 @@ func (state inSession) resendMessages(session *session, beginSeqNo, endSeqNo int
 
 	seqNum := beginSeqNo
 	nextSeqNum := seqNum
-	msg := NewMessage()
+	msg := NewMessageFromPool()
+	defer ReleaseMessageToPool(msg)
 	for _, msgBytes := range msgs {
 		_ = ParseMessageWithDataDictionary(msg, bytes.NewBuffer(msgBytes), session.transportDataDictionary, session.appDataDictionary)
 		msgType, _ := msg.Header.GetBytes(tagMsgType)
@@ -379,7 +382,9 @@ func (state inSession) doTargetTooLow(session *session, msg *Message, rej target
 }
 
 func (state *inSession) generateSequenceReset(session *session, beginSeqNo int, endSeqNo int, inReplyTo Message) (err error) {
-	sequenceReset := NewMessage()
+	sequenceReset := NewMessageFromPool()
+	defer ReleaseMessageToPool(sequenceReset)
+
 	session.fillDefaultHeader(sequenceReset, &inReplyTo)
 
 	sequenceReset.Header.SetField(tagMsgType, FIXString("4"))

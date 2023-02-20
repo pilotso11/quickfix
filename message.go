@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/quickfixgo/quickfix/datadictionary"
@@ -119,8 +120,50 @@ type parseError struct {
 
 func (e parseError) Error() string { return fmt.Sprintf("error parsing message: %s", e.OrigError) }
 
+// Create a message pool for message allocations to minimize allocations, where possible
+var messagePool = sync.Pool{
+	New: func() any { return new(Message) },
+}
+
+func NewMessageFromPool() *Message {
+	m := messagePool.Get().(*Message)
+	if m == nil {
+		m = new(Message)
+	}
+	m.Header.Init()
+	m.Body.Init()
+	m.Trailer.Init()
+	return m
+}
+
+func ReleaseMessageToPool(m *Message) {
+	if m == nil {
+		return
+	}
+	if m.keepMessage {
+		return
+	}
+
+	m.Header.Clear()
+	m.Body.Clear()
+	m.Trailer.Clear()
+	m.rawMessage = nil
+	m.bodyBytes = nil
+	m.fields = m.fields[0:0]
+	messagePool.Put(m)
+}
+
+// AlwaysUseMessagePool can be turned on to force the generated message constructors to return objects from the pool.
+// To be reused after sending they must also be released to the pool.  If message generation and sending are able to stay
+// on the stack, then do not use the message pool for outbound messages.
+var AlwaysUseMessagePool = false
+
 // NewMessage returns a newly initialized Message instance.
 func NewMessage() *Message {
+	if AlwaysUseMessagePool {
+		return NewMessageFromPool()
+	}
+
 	m := new(Message)
 	m.Header.Init()
 	m.Body.Init()

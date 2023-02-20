@@ -111,10 +111,14 @@ func (e *MockApp) ToAdmin(msg *Message, sessionID SessionID) {
 		e.decorateToAdmin(msg)
 	}
 
+	// Don't release it to the pool
+	msg.keepMessage = true
 	e.lastToAdmin = msg
 }
 
 func (e *MockApp) ToApp(msg *Message, sessionID SessionID) (err error) {
+	// Prevent release to the pool
+	msg.keepMessage = true
 	e.lastToApp = msg
 	return e.Called().Error(0)
 }

@@ -165,7 +165,8 @@ func (s *session) sendLogon() error {
 }
 
 func (s *session) sendLogonInReplyTo(setResetSeqNum bool, inReplyTo *Message) error {
-	logon := NewMessage()
+	logon := NewMessageFromPool()
+	defer ReleaseMessageToPool(logon)
 	logon.Header.SetField(tagMsgType, FIXString("A"))
 	logon.Header.SetField(tagBeginString, FIXString(s.sessionID.BeginString))
 	logon.Header.SetField(tagTargetCompID, FIXString(s.sessionID.TargetCompID))
@@ -380,7 +381,9 @@ func (s *session) doTargetTooHigh(reject targetTooHigh) (nextState resendState, 
 func (s *session) sendResendRequest(beginSeq, endSeq int) (nextState resendState, err error) {
 	nextState.resendRangeEnd = endSeq
 
-	resend := NewMessage()
+	resend := NewMessageFromPool()
+	defer ReleaseMessageToPool(resend)
+
 	resend.Header.SetBytes(tagMsgType, msgTypeResendRequest)
 	resend.Body.SetField(tagBeginSeqNo, FIXInt(beginSeq))
 

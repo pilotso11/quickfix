@@ -242,7 +242,8 @@ func (a *Acceptor) handleConnection(netConn net.Conn) {
 		return
 	}
 
-	msg := NewMessage()
+	msg := NewMessageFromPool()
+	defer ReleaseMessageToPool(msg)
 	err = ParseMessage(msg, msgBytes)
 	if err != nil {
 		a.invalidMessage(msgBytes, err)

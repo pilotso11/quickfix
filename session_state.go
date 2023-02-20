@@ -83,7 +83,9 @@ func (sm *stateMachine) Incoming(session *session, m fixIn) {
 
 	session.log.OnIncoming(m.bytes.Bytes())
 
-	msg := NewMessage()
+	msg := NewMessageFromPool() // todo - get from cache!
+	defer ReleaseMessageToPool(msg)
+
 	if err := ParseMessageWithDataDictionary(msg, m.bytes, session.transportDataDictionary, session.appDataDictionary); err != nil {
 		session.log.OnEventf("Msg Parse Error: %v, %q", err.Error(), m.bytes)
 	} else {

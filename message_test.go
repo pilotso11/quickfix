@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"reflect"
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/suite"
 
@@ -239,4 +240,55 @@ func checkFieldString(s *MessageSuite, fields FieldMap, tag int, expected string
 	toCheck, err := fields.GetString(Tag(tag))
 	s.NoError(err)
 	s.Equal(expected, toCheck)
+}
+
+func (s *MessageSuite) TestMessagePoolReturnsClean() {
+	nm := NewMessage()
+	nm2 := NewMessageFromPool()
+
+	s.Equal(nm.String(), nm2.String())
+}
+
+func (s *MessageSuite) TestMessagePoolReturnsCleanAfterRelease() {
+	nm := NewMessage()
+	nm2 := NewMessageFromPool()
+
+	// Clean from pool
+	s.Equal(nm.String(), nm2.String())
+
+	// Put a message in it
+	msgString := "8=FIX.4.29=17135=D34=249=TW50=KK52=20060102-15:04:0556=ISLD57=AP144=BB115=JCD116=CS128=MG129=CB142=JV143=RY145=BH11=ID21=338=10040=w54=155=INTC60=20060102-15:04:0510=123"
+	msgBuf := bytes.NewBufferString(msgString)
+	ParseMessage(nm2, msgBuf)
+	s.NotEqual(nm.String(), nm2.String())
+
+	// Save pointer and release to pool
+	p1 := unsafe.Pointer(nm2)
+	ReleaseMessageToPool(nm2)
+
+	// Get back from pool
+	nm3 := NewMessageFromPool()
+	p2 := unsafe.Pointer(nm3)
+	s.Equal(p1, p2)
+
+	// Check its cleaned
+	s.Equal(nm.String(), nm3.String())
+}
+
+func (s *MessageSuite) TestAlwaysUseMessagePool() {
+	AlwaysUseMessagePool = false
+	nm2 := NewMessageFromPool()
+	p1 := unsafe.Pointer(nm2)
+	ReleaseMessageToPool(nm2)
+	nm := NewMessage()
+	p2 := unsafe.Pointer(nm)
+	// When off, i don't get a pool message
+	s.NotEqual(p1, p2)
+
+	// When on, I get the pool object
+	AlwaysUseMessagePool = true
+	nm = NewMessage()
+	p2 = unsafe.Pointer(nm)
+	s.Equal(p1, p2)
+
 }
